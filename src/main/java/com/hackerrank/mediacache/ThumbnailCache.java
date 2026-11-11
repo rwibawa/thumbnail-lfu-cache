@@ -10,9 +10,10 @@ import com.hackerrank.mediacache.model.ThumbnailCacheMetrics;
 
 public class ThumbnailCache<K, V> implements MediaCache<K, V> {
 
-    private final DoublyLinkedList<K, V> queue = new DoublyLinkedList<>();
     private final Map<K, Node<K, V>> entries = new HashMap<>();
+    private final Map<Integer, DoublyLinkedList<K, V>> frequencyBuckets = new HashMap<>();
     private final int maxSlots;
+    private int minFrequency;
     private long numberOfHits;
     private long numberOfMisses;
     private long numberOfEvictions;
@@ -36,7 +37,7 @@ public class ThumbnailCache<K, V> implements MediaCache<K, V> {
             return null;
         }
 
-        queue.moveToMru(node);
+        increaseFrequency(node);
         numberOfHits++;
         return node.value;
     }
@@ -50,19 +51,42 @@ public class ThumbnailCache<K, V> implements MediaCache<K, V> {
         Node<K, V> existingNode = entries.get(assetId);
         if (existingNode != null) {
             existingNode.value = payload;
-            queue.moveToMru(existingNode);
+            increaseFrequency(existingNode);
             return;
         }
 
         if (entries.size() == maxSlots) {
-            Node<K, V> evictedNode = queue.evictLru();
+            DoublyLinkedList<K, V> leastFrequentBucket = frequencyBuckets.get(minFrequency);
+            Node<K, V> evictedNode = leastFrequentBucket.evictLru();
+            if (leastFrequentBucket.isEmpty()) {
+                frequencyBuckets.remove(minFrequency);
+            }
             entries.remove(evictedNode.key);
             numberOfEvictions++;
         }
 
-        Node<K, V> newNode = queue.newNode(assetId, payload);
-        queue.linkAsMru(newNode);
+        DoublyLinkedList<K, V> newBucket = frequencyBuckets.computeIfAbsent(
+                1, frequency -> new DoublyLinkedList<>());
+        Node<K, V> newNode = newBucket.newNode(assetId, payload);
+        newBucket.linkAsMru(newNode);
         entries.put(assetId, newNode);
+        minFrequency = 1;
+    }
+
+    private void increaseFrequency(Node<K, V> node) {
+        int oldFrequency = node.frequency;
+        DoublyLinkedList<K, V> oldBucket = frequencyBuckets.get(oldFrequency);
+        oldBucket.unlink(node);
+        if (oldBucket.isEmpty()) {
+            frequencyBuckets.remove(oldFrequency);
+            if (oldFrequency == minFrequency) {
+                minFrequency++;
+            }
+        }
+
+        node.frequency++;
+        frequencyBuckets.computeIfAbsent(node.frequency, frequency -> new DoublyLinkedList<>())
+                .linkAsMru(node);
     }
 
     @Override

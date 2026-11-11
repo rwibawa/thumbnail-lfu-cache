@@ -1,10 +1,10 @@
-# Thumbnail LRU Cache 
+# Thumbnail LFU Cache
 
 Run all commands from this directory (project root).
 
 ## Task
 
-Create a simple in-memory thumbnail cache using Java. It should store data (`payload`) against an `assetId`. When the cache is full, it should remove the item that has not been used for the longest time.
+Create a simple in-memory thumbnail cache using Java. It should store data (`payload`) against an `assetId`. When the cache is full, it should remove the item with the fewest accesses. If multiple items have the same frequency, remove the least recently used one among them.
 
 ## Rules
 
@@ -16,15 +16,15 @@ Create a simple in-memory thumbnail cache using Java. It should store data (`pay
 ### GET
 
 - `get(assetId)` returns payload if `assetId` exists; otherwise returns `null`.
-- If found, mark the item as most recently used.
-- If not found, recency order does not change.
+- If found, increase the item's access frequency.
+- If not found, frequency and recency order do not change.
 - If `assetId` is `null`, throw `NullPointerException`.
 
 ### PUT
 
 - `put(assetId, payload)` adds a new item or updates an existing item.
-- If item exists, update payload and mark as most recently used.
-- If it is a new item and cache is full, remove the least recently used item first, then insert.
+- If item exists, update payload and increase its access frequency.
+- If it is a new item and cache is full, remove the least frequently used item first. Use least-recently-used order to break frequency ties.
 - If `assetId` or `payload` is `null`, throw `NullPointerException`.
 
 ### METRICS
@@ -37,7 +37,7 @@ Track these counters since cache creation:
 
 Invalid operations must not change metrics.
 
-If multiple operations happen, update recency and metrics in the same order as operations execute.
+If multiple operations happen, update frequency, tie-breaking recency, and metrics in the same order as operations execute.
 
 The first valid operation starts from an empty cache: no entries, metrics `(0, 0, 0)`.
 
@@ -66,16 +66,16 @@ Exception in thread "main" java.lang.AssertionError: TODO: implement constructor
 
 #### Expected after you complete the exercise
 
-When `ThumbnailCache` (and any broken helpers the demo path uses) are correct, you should see four lines of normal output, for example:
+The demo calls `get(101)` twice and `get(202)` once before inserting `303`. When `ThumbnailCache` is correct, `202` is evicted even though it was accessed more recently, because its frequency is lower. You should see four lines of normal output:
 
 ```
 thumb-101-bytes
 null
 thumb-303-bytes
-ThumbnailCacheMetrics{hits=2, misses=1, evictions=1}
+ThumbnailCacheMetrics{hits=5, misses=1, evictions=1}
 ```
 
-Those values match the sequence in `Main.java`: a hit on `101`, a miss on evicted `202`, a hit on `303`, and metrics after those operations.
+The final lookups hit `101` and `303` and miss on evicted `202`; the three setup lookups also count as hits.
 
 ### Running tests
 
@@ -85,5 +85,4 @@ With the starter code, `mvn clean test` reports all tests failing (for example `
 
 - Expected O(1) average time for `get` and `put`.
 - Keep memory bounded by `maxSlots`.
-- Keep recency updates efficient.
-
+- Keep frequency updates and recency-based tie-breaking efficient.

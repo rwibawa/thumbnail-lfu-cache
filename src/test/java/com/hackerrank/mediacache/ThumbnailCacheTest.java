@@ -19,7 +19,7 @@ public class ThumbnailCacheTest extends TestCase {
         assertMetrics(cache, 0, 1, 0);
     }
 
-    public void testPutAndGetCountHits() {
+    public void testGetCountsHitsAndReturnsPayload() {
         ThumbnailCache<Integer, String> cache = new ThumbnailCache<>(2);
         cache.put(101, "thumbnail-101");
 
@@ -28,44 +28,49 @@ public class ThumbnailCacheTest extends TestCase {
         assertMetrics(cache, 1, 1, 0);
     }
 
-    public void testGetMovesEntryToMostRecentlyUsedPosition() {
+    public void testEvictsLeastFrequentlyUsedEntry() {
         ThumbnailCache<Integer, String> cache = new ThumbnailCache<>(2);
         cache.put(101, "thumbnail-101");
         cache.put(202, "thumbnail-202");
+        cache.get(101);
+        cache.get(101);
+        cache.get(202);
 
-        assertEquals("thumbnail-101", cache.get(101));
         cache.put(303, "thumbnail-303");
 
         assertEquals("thumbnail-101", cache.get(101));
         assertNull(cache.get(202));
         assertEquals("thumbnail-303", cache.get(303));
-        assertMetrics(cache, 3, 1, 1);
+        assertMetrics(cache, 5, 1, 1);
     }
 
-    public void testMissDoesNotChangeEvictionOrder() {
+    public void testEvictsLeastRecentlyUsedEntryWhenFrequenciesTie() {
         ThumbnailCache<Integer, String> cache = new ThumbnailCache<>(2);
         cache.put(101, "thumbnail-101");
         cache.put(202, "thumbnail-202");
+        cache.get(101);
+        cache.get(202);
 
-        assertNull(cache.get(303));
         cache.put(303, "thumbnail-303");
 
         assertNull(cache.get(101));
         assertEquals("thumbnail-202", cache.get(202));
-        assertMetrics(cache, 1, 2, 1);
+        assertEquals("thumbnail-303", cache.get(303));
+        assertMetrics(cache, 4, 1, 1);
     }
 
-    public void testUpdatingEntryChangesPayloadAndMarksItRecentlyUsed() {
+    public void testUpdatingEntryChangesPayloadAndIncreasesFrequency() {
         ThumbnailCache<Integer, String> cache = new ThumbnailCache<>(2);
         cache.put(101, "old-thumbnail");
-        cache.put(202, "thumbnail-202");
-        cache.put(101, "new-thumbnail");
+        cache.put(202, "old-thumbnail-202");
+        cache.get(101);
+        cache.put(202, "new-thumbnail-202");
         cache.put(303, "thumbnail-303");
 
-        assertEquals("new-thumbnail", cache.get(101));
-        assertNull(cache.get(202));
+        assertNull(cache.get(101));
+        assertEquals("new-thumbnail-202", cache.get(202));
         assertEquals("thumbnail-303", cache.get(303));
-        assertMetrics(cache, 2, 1, 1);
+        assertMetrics(cache, 3, 1, 1);
     }
 
     public void testCapacityOneEvictsPreviousEntry() {
@@ -76,6 +81,20 @@ public class ThumbnailCacheTest extends TestCase {
         assertNull(cache.get(101));
         assertEquals("thumbnail-202", cache.get(202));
         assertMetrics(cache, 1, 1, 1);
+    }
+
+    public void testMissDoesNotChangeFrequencyOrEvictionOrder() {
+        ThumbnailCache<Integer, String> cache = new ThumbnailCache<>(2);
+        cache.put(101, "thumbnail-101");
+        cache.put(202, "thumbnail-202");
+        cache.get(101);
+        cache.get(303);
+
+        cache.put(303, "thumbnail-303");
+
+        assertEquals("thumbnail-101", cache.get(101));
+        assertNull(cache.get(202));
+        assertMetrics(cache, 2, 2, 1);
     }
 
     public void testNullArgumentsThrowWithoutChangingMetrics() {

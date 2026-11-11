@@ -5,6 +5,7 @@ public final class DoublyLinkedList<K, V> {
     public static final class Node<K, V> {
         public final K key;
         public V value;
+        public int frequency = 1;
         public Node<K, V> prev;
         public Node<K, V> next;
 
@@ -26,8 +27,8 @@ public final class DoublyLinkedList<K, V> {
         return new Node<>(key, value);
     }
 
-    public Node<K, V> getHead() {
-        return head;
+    public boolean isEmpty() {
+        return head.next == tail;
     }
 
     public void linkAsMru(Node<K, V> node) {
@@ -40,14 +41,6 @@ public final class DoublyLinkedList<K, V> {
     public void unlink(Node<K, V> node) {
         node.prev.next = node.next;
         node.next.prev = node.prev;
-    }
-
-    public void moveToMru(Node<K, V> node) {
-        if (node.next == tail) {
-            return;
-        }
-        unlink(node);
-        linkAsMru(node);
     }
 
     public Node<K, V> evictLru() {
